@@ -16,6 +16,7 @@ import java.util.List;
 public class Track {
 
     private static final String DISABLED = "__disabled__";
+    private static final String AUTO = "__auto__";
 
     @PrimaryKey(autoGenerate = true)
     private int id;
@@ -35,6 +36,12 @@ public class Track {
 
     public static Track disabled(int type, String name) {
         Track track = new Track(type, name, DISABLED);
+        track.setSelected(true);
+        return track;
+    }
+
+    public static Track auto(int type, String name) {
+        Track track = new Track(type, name, AUTO);
         track.setSelected(true);
         return track;
     }
@@ -121,6 +128,10 @@ public class Track {
 
     public boolean isDisabled() {
         return DISABLED.equals(getFormat());
+    }
+
+    public boolean isAuto() {
+        return AUTO.equals(getFormat());
     }
 
     public Track toggle() {

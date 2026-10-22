@@ -97,6 +97,7 @@
     <string name="play_track_text">字幕</string>
     <string name="play_track_audio">音轨</string>
     <string name="play_track_video">视轨</string>
+    <string name="play_track_auto">自动</string>
     <string name="play_track_disable_subtitle">关闭字幕</string>
     <string name="play_track_disable_secondary_subtitle">关闭第二字幕</string>
     <string name="play_track_secondary_subtitle">第二字幕</string>

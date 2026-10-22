@@ -6,6 +6,8 @@ import androidx.media3.common.MimeTypes;
 import androidx.media3.common.TrackGroup;
 import androidx.media3.common.Tracks;
 
+import com.fongmi.android.tv.bean.Track;
+
 import org.junit.Test;
 
 import java.util.List;
@@ -136,6 +138,22 @@ public class TrackUtilTest {
                 .setHeight(height)
                 .setAverageBitrate(bitrate)
                 .build();
+    }
+
+    @Test
+    public void stableDescriptionIgnoresRuntimeId() {
+        Format first = video("video/avc", 1920, 1080).buildUpon().setId("runtime-1").setCodecs("avc1.640028").build();
+        Format second = video("video/avc", 1920, 1080).buildUpon().setId("runtime-2").setCodecs("avc1.640028").build();
+
+        assertEquals(TrackUtil.describeStable(first), TrackUtil.describeStable(second));
+    }
+
+    @Test
+    public void autoTrackIsNotDisabled() {
+        Track auto = Track.auto(C.TRACK_TYPE_VIDEO, "Auto");
+
+        assertTrue(auto.isAuto());
+        assertFalse(auto.isDisabled());
     }
 
     private static Format video(String mimeType, int width, int height) {

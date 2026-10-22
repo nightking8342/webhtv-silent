@@ -98,6 +98,7 @@
     <string name="play_track_text">Text</string>
     <string name="play_track_audio">Audio</string>
     <string name="play_track_video">Video</string>
+    <string name="play_track_auto">Auto</string>
     <string name="play_track_disable_subtitle">Subtitle off</string>
     <string name="play_track_disable_secondary_subtitle">Secondary subtitle off</string>
     <string name="play_track_secondary_subtitle">Secondary</string>

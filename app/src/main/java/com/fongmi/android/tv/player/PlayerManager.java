@@ -64,6 +64,7 @@ import com.fongmi.android.tv.player.exo.ExoRtspLiveLagPolicy;
 import com.fongmi.android.tv.player.exo.ExoUtil;
 import com.fongmi.android.tv.player.exo.ForwardBufferTrend;
 import com.fongmi.android.tv.player.exo.PlaybackAnalyticsListener;
+import com.fongmi.android.tv.player.exo.TrackUtil;
 import com.fongmi.android.tv.player.ijk.IjkBufferController;
 import com.fongmi.android.tv.player.ijk.IjkBufferPolicy;
 import com.fongmi.android.tv.player.ijk.IjkDecodePressureController;
@@ -281,6 +282,9 @@ public class PlayerManager implements ParseCallback {
     private Object audioFocusRequest;
 
     private boolean initTrack;
+    private boolean restoringTracks;
+    private boolean videoPinned;
+    private boolean audioPinned;
     private boolean videoEffectsActive;
     private boolean videoEffectsDirty;
     private boolean parseHealthRecorded;
@@ -1276,7 +1280,7 @@ public class PlayerManager implements ParseCallback {
     }
 
     public void setSub(Sub sub) {
-        if (sub == null || spec == null) return;
+        if (sub == null || spec == null || hasSub(sub)) return;
         Track.delete(getKey(), C.TRACK_TYPE_TEXT);
         engine.resetTrack(C.TRACK_TYPE_TEXT);
         spec.setSub(sub);
@@ -1301,6 +1305,14 @@ public class PlayerManager implements ParseCallback {
      */
     public void setPendingRestoreSub(Sub sub) {
         pendingRestoreSub = sub;
+    }
+
+    private boolean hasSub(Sub sub) {
+        if (spec == null || spec.getSubs() == null) return false;
+        for (Sub item : spec.getSubs()) {
+            if (item != null && sub.getUrl().equals(item.getUrl())) return true;
+        }
+        return false;
     }
 
     public void setFormat(String format) {
@@ -1747,11 +1759,47 @@ public class PlayerManager implements ParseCallback {
     }
 
     public void setTrack(List<Track> tracks) {
-        mpvExplicitSubtitlePreference = hasRequestedSubtitle(tracks);
+        if (tracks == null || tracks.isEmpty()) return;
+        List<Track> effective = new ArrayList<>(tracks.size());
+        for (Track track : tracks) {
+            if (track.isAuto()) {
+                clearTrack(track.getType());
+                continue;
+            }
+            if (track.isSelected() && !track.isDisabled()) setTrackPinned(track.getType(), true);
+            effective.add(track);
+        }
+        if (effective.isEmpty()) return;
+        mpvExplicitSubtitlePreference = hasRequestedSubtitle(effective);
         if (mpvExplicitSubtitlePreference && engine instanceof MpvPlayerEngine mpv) {
             mpv.retainSubtitleSurfaceForCurrentItem();
         }
-        if (!tracks.isEmpty()) engine.setTrack(tracks);
+        engine.setTrack(effective);
+    }
+
+    /** Drops the explicit selection of one type and returns to adaptive selection. */
+    public void clearTrack(int type) {
+        if (!isExo() || engine == null) return;
+        TrackUtil.clearType(getPlayer(), type);
+        setTrackPinned(type, false);
+        Track.auto(type, "auto").key(getKey()).save();
+        SpiderDebug.log("player", "clear track type=%d key=%s", type, getKey());
+    }
+
+    public boolean isTrackPinned(int type) {
+        if (type == C.TRACK_TYPE_VIDEO) return videoPinned;
+        if (type == C.TRACK_TYPE_AUDIO) return audioPinned;
+        return false;
+    }
+
+    private void setTrackPinned(int type, boolean pinned) {
+        if (type == C.TRACK_TYPE_VIDEO) videoPinned = pinned;
+        else if (type == C.TRACK_TYPE_AUDIO) audioPinned = pinned;
+    }
+
+    private void resetTrackPins() {
+        videoPinned = false;
+        audioPinned = false;
     }
 
     public void setSecondarySubtitleTrack(Track track) {
@@ -5837,7 +5885,17 @@ public void resetTrack(int type) {
     }
 
     private void restoreTrackSelection(List<Track> tracks) {
-        if (tracks != null && !tracks.isEmpty()) engine.setTrack(tracks);
+        if (tracks == null || tracks.isEmpty()) return;
+        List<Track> effective = new ArrayList<>(tracks.size());
+        for (Track track : tracks) {
+            if (track.isAuto()) {
+                if (isExo()) TrackUtil.clearType(getPlayer(), track.getType());
+                setTrackPinned(track.getType(), false);
+                continue;
+            }
+            effective.add(track);
+        }
+        if (!effective.isEmpty()) engine.setTrack(effective);
     }
 
     private void onMpvVideoSizeProbed(Integer width, Integer height) {
@@ -6074,6 +6132,7 @@ public void resetTrack(int type) {
         endPlaybackTelemetrySession("replace-start");
         prepareIjkRuntimeForUserPlayback();
         clearPendingSwitchRestore();
+        resetTrackPins();
         clearDanmaku("start");
         this.spec = spec;
         pendingInitialStartPositionMs = positionMs > 0 ? positionMs : C.TIME_UNSET;
@@ -6104,6 +6163,7 @@ public void resetTrack(int type) {
         prepareIjkRuntimeForUserPlayback();
         stopParse();
         clearPendingSwitchRestore();
+        resetTrackPins();
         clearDanmaku("parse");
         spec = PlaySpec.fromParse(result, key, metadata, useParse);
         pendingInitialStartPositionMs = positionMs > 0 ? positionMs : C.TIME_UNSET;
@@ -8731,17 +8791,22 @@ public void resetTrack(int type) {
         @Override
         public void onTracksChanged(@NonNull Tracks tracks) {
             if (playbackTrackSequence < Long.MAX_VALUE) playbackTrackSequence++;
-            publishPlaybackAutoContext(false);
             if (isExo()) scheduleNetworkProtection(0);
-            if (!tracks.isEmpty() && !initTrack) {
+            if (!tracks.isEmpty() && !initTrack && !restoringTracks) {
+                restoringTracks = true;
                 playbackTrace.mark(PlaybackTrace.Stage.TRACKS, trackSummary(tracks));
-                restoreTrackSelection(Track.find(getKey()));
-                if (engine instanceof MpvPlayerEngine mpv) {
-                    mpv.completeInitialSubtitleTrackRestore();
+                try {
+                    restoreTrackSelection(Track.find(getKey()));
+                    if (engine instanceof MpvPlayerEngine mpv) {
+                        mpv.completeInitialSubtitleTrackRestore();
+                    }
+                } finally {
+                    restoringTracks = false;
                 }
                 callback.onTracksChanged();
                 initTrack = true;
             }
+            publishPlaybackAutoContext(false);
             markStartupCompletion(player != null && player.getPlaybackState() == Player.STATE_READY, tracks);
             publishPlaybackTelemetry();
             applyLutForCurrentItem();

@@ -11,6 +11,7 @@ import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
 
 import com.fongmi.android.tv.bean.Track;
 import com.fongmi.android.tv.player.PlayerHelper;
+import com.github.catvod.crawler.SpiderDebug;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -18,6 +19,8 @@ import java.util.List;
 import java.util.Map;
 
 public class TrackUtil {
+
+    private static final String STABLE_PREFIX = "v2|";
 
     public static int count(Tracks tracks, int type) {
         return tracks.getGroups().stream().filter(trackGroup -> trackGroup.getType() == type).mapToInt(trackGroup -> trackGroup.length).sum();
@@ -118,6 +121,28 @@ public class TrackUtil {
         player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon().clearOverrides().setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false).setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, false).setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false).build());
     }
 
+    /** Clears the explicit selection of one type and re-enables adaptive selection. */
+    public static void clearType(Player player, int type) {
+        player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
+                .clearOverridesOfType(type)
+                .setTrackTypeDisabled(type, false)
+                .build());
+    }
+
+    /** Stable identity for persisted selections; runtime ids are intentionally excluded. */
+    public static String describeStable(Format format) {
+        return STABLE_PREFIX
+                + empty(format.sampleMimeType) + '|'
+                + empty(format.codecs) + '|'
+                + format.width + '|'
+                + format.height + '|'
+                + empty(format.language);
+    }
+
+    private static String empty(String value) {
+        return value == null ? "" : value;
+    }
+
     public static void enable(Player player, int type) {
         player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon().setTrackTypeDisabled(type, false).build());
     }
@@ -133,16 +158,26 @@ public class TrackUtil {
             }
         }
         if (track.getFormat() == null) return null;
+        boolean stable = track.getFormat().startsWith(STABLE_PREFIX);
         for (Tracks.Group trackGroup : currentTracks.getGroups()) {
             if (trackGroup.getType() != track.getType()) continue;
             for (int i = 0; i < trackGroup.length; i++) {
                 Format format = trackGroup.getTrackFormat(i);
-                if (track.getFormat().equals(PlayerHelper.describeFormat(format))) {
+                boolean matches = stable
+                        ? track.getFormat().equals(describeStable(format))
+                        : track.getFormat().equals(PlayerHelper.describeFormat(format));
+                if (matches) {
                     return new TrackInfo(trackGroup, i);
                 }
             }
         }
         return null;
+    }
+
+    /** Whether the exact group/index is part of the user's explicit override. */
+    public static boolean isExplicitlySelected(Player player, Tracks.Group group, int index) {
+        TrackSelectionOverride override = player.getTrackSelectionParameters().overrides.get(group.getMediaTrackGroup());
+        return override != null && override.trackIndices.contains(index);
     }
 
     /** Resolves a current runtime id first, falling back to a persisted format preference. */
@@ -175,7 +210,11 @@ public class TrackUtil {
             builder.setTrackTypeDisabled(type, mediaGroup == null);
             if (mediaGroup == null) return;
             Integer selectedIndex = selectedIndexMapByType.get(type);
-            List<Integer> indices = selectedIndex != null ? List.of(selectedIndex) : List.of();
+            if (selectedIndex == null) {
+                SpiderDebug.log("track", "skip empty override type=%d group=%s", type, mediaGroup.id);
+                return;
+            }
+            List<Integer> indices = List.of(selectedIndex);
             builder.setOverrideForType(new TrackSelectionOverride(mediaGroup, indices));
         });
         player.setTrackSelectionParameters(builder.build());

@@ -576,9 +576,17 @@ public final class TrackDialog extends BaseBottomSheetDialog implements TrackAda
 
     private List<Track> getTrack() {
         List<Track> items = new ArrayList<>();
+        addAutoTrack(items);
         addTrack(items);
         addDisableTrack(items);
         return items;
+    }
+
+    private void addAutoTrack(List<Track> items) {
+        if (type == C.TRACK_TYPE_TEXT || !player.isExo()) return;
+        Track item = Track.auto(type, getString(R.string.play_track_auto));
+        item.setSelected(!player.isTrackPinned(type));
+        items.add(item);
     }
 
     private void addTrack(List<Track> items) {
@@ -599,7 +607,7 @@ public final class TrackDialog extends BaseBottomSheetDialog implements TrackAda
                 // Keep the player's native track id with the visible item. Runtime track
                 // switching must target this stable id directly; the formatted description
                 // is only persisted for restoring a preference on the next playback.
-                Track item = new Track(type, name, PlayerHelper.describeFormat(format)).playerId(format.id);
+                Track item = new Track(type, name, TrackUtil.describeStable(format)).playerId(format.id);
                 item.setSelected(isSelected(trackGroup, j, format, active));
                 items.add(item);
             }
@@ -808,11 +816,17 @@ public final class TrackDialog extends BaseBottomSheetDialog implements TrackAda
     @Override
     public void onItemClick(Track item) {
         if (type == C.TRACK_TYPE_TEXT) stopRealtimeAi();
+        if (item.isAuto()) {
+            player.clearTrack(type);
+            dismiss();
+            return;
+        }
         if (secondarySubtitle) {
             player.setSecondarySubtitleTrack(item);
             dismiss();
             return;
         }
+        item.setSelected(true);
         player.setTrack(Arrays.asList(item.key(player.getKey()).save()));
         dismiss();
     }
