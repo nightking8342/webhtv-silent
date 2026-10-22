@@ -14,6 +14,7 @@ import com.fongmi.android.tv.db.AppDatabase;
 import com.fongmi.android.tv.bean.History;
 import com.fongmi.android.tv.bean.Result;
 import com.fongmi.android.tv.bean.Site;
+import com.fongmi.android.tv.bean.Sub;
 import com.fongmi.android.tv.bean.drive.DriveCheckRequest;
 import com.fongmi.android.tv.server.Server;
 import com.fongmi.android.tv.service.DriveCheckService;
@@ -263,10 +264,28 @@ public class HomeWebBridge {
         final String playPic = pic;
         final String playWall = wall;
         final String playContent = content;
+        final String playSubs = subtitlePayload(payload);
         SpiderDebug.log("webhome", "player.playUrl title=%s url=%s", playTitle,
                 HomeWebController.safeLogUrl(playUrl));
-        App.post(() -> controller.prepareNativePlayback(() -> VideoActivity.start(activity, SiteApi.PUSH, playUrl, playTitle, playPic, null, playWall, playContent)));
+        App.post(() -> controller.prepareNativePlayback(() -> VideoActivity.start(activity, SiteApi.PUSH, playUrl, playTitle, playPic, null, playWall, playContent, playSubs)));
         return "{}";
+    }
+
+    private String subtitlePayload(JsonObject payload) {
+        JsonArray out = new JsonArray();
+        JsonElement subs = payload.get("subs");
+        if (subs != null && subs.isJsonArray()) {
+            for (JsonElement item : subs.getAsJsonArray()) {
+                if (item == null || item.isJsonNull()) continue;
+                if (item.isJsonPrimitive()) out.add(new Gson().toJsonTree(Sub.from(item.getAsString())));
+                else if (item.isJsonObject()) out.add(item);
+            }
+        }
+        if (out.size() == 0) {
+            String single = Json.safeString(payload, "subtitle");
+            if (!TextUtils.isEmpty(single)) out.add(new Gson().toJsonTree(Sub.from(single)));
+        }
+        return out.size() == 0 ? null : out.toString();
     }
 
     private String playVod(JsonObject payload) {

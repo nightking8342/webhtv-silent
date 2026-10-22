@@ -748,6 +748,24 @@ private boolean runtimeSourceOnly;
         start(activity, key, id, name, pic, mark, false, false, wallPic, content);
     }
 
+    public static void start(Activity activity, String key, String id, String name, String pic, String mark, String wallPic, String content, String subs) {
+        long launch = System.currentTimeMillis();
+        SpiderDebug.log("video-flow", "launch request key=%s id=%s name=%s subs=%s", key, id, name, !TextUtils.isEmpty(subs));
+        ImgUtil.preload(activity, pic);
+        if (Setting.isPlaybackArtworkWall() && !TextUtils.isEmpty(wallPic) && !TextUtils.equals(wallPic, pic)) ImgUtil.preload(activity, wallPic);
+        Intent intent = new Intent(activity, VideoActivity.class);
+        intent.putExtra("launchTime", launch);
+        intent.putExtra("mark", mark);
+        intent.putExtra("name", name);
+        intent.putExtra("pic", pic);
+        intent.putExtra("wallPic", wallPic);
+        intent.putExtra("content", content);
+        intent.putExtra("subs", subs);
+        intent.putExtra("key", key);
+        intent.putExtra("id", id);
+        activity.startActivity(intent);
+    }
+
     public static void start(Activity activity, String key, String id, String name, String pic, String mark, boolean collect, boolean cast) {
         start(activity, key, id, name, pic, mark, collect, cast, (String) null);
     }
@@ -3432,6 +3450,7 @@ private boolean runtimeSourceOnly;
             return;
         }
         mAppliedPlayerResult = result;
+        applyIntentSubs(result);
         mQualityAdapter.addAll(result);
         mQualityAdapter.setPosition(mQualityAdapter.getPosition());
         setUseParse(result.shouldUseParse());
@@ -3860,6 +3879,14 @@ private boolean runtimeSourceOnly;
                 && !player().isReleased()
                 && !player().isEmpty()
                 && isOwner();
+    }
+
+    private void applyIntentSubs(Result result) {
+        if (!SiteApi.PUSH.equals(getKey()) || !result.getSubs().isEmpty()) return;
+        List<Sub> subs = Sub.listFrom(Objects.toString(getIntent().getStringExtra("subs"), ""));
+        if (subs.isEmpty()) return;
+        result.setSubs(subs);
+        SpiderDebug.log("video-flow", "intent subs applied count=%d", subs.size());
     }
 
     private void recordDetailHealth(Result result, long cost) {

@@ -994,6 +994,21 @@ private final Task.Scope mPersonalRecommendationTasks = new Task.Scope(Task.reco
         return com.fongmi.android.tv.content.ContentDispatcher.dispatchSite(activity, key, id, name, pic, mark);
     }
 
+    public static void start(Activity activity, String key, String id, String name, String pic, String mark, String wallPic, String content, String subs) {
+        ImgUtil.preload(activity, pic);
+        if (Setting.isPlaybackArtworkWall() && !TextUtils.isEmpty(wallPic) && !TextUtils.equals(wallPic, pic)) ImgUtil.preload(activity, wallPic);
+        Intent intent = new Intent(activity, VideoActivity.class);
+        intent.putExtra("mark", mark);
+        intent.putExtra("name", name);
+        intent.putExtra("pic", pic);
+        intent.putExtra("wallPic", wallPic);
+        intent.putExtra("content", content);
+        intent.putExtra("subs", subs);
+        intent.putExtra("key", key);
+        intent.putExtra("id", id);
+        activity.startActivity(intent);
+    }
+
     private String getName() {
         return Objects.toString(getIntent().getStringExtra("name"), "");
     }
@@ -3262,6 +3277,7 @@ private final Task.Scope mPersonalRecommendationTasks = new Task.Scope(Task.reco
             mPendingPlayerResult = result;
             return;
         }
+        applyIntentSubs(result);
         SpiderDebug.log("video-flow", "player finish cost=%dms useParse=%s multi=%s msg=%s", System.currentTimeMillis() - playerStartTime, result.shouldUseParse(), result.getUrl().isMulti(), result.getMsg());
         if (result == mAppliedPlayerResult && !player().isEmpty()) return;
         mAppliedPlayerResult = result;
@@ -3313,6 +3329,15 @@ private final Task.Scope mPersonalRecommendationTasks = new Task.Scope(Task.reco
         }
         return handled;
     }
+
+    private void applyIntentSubs(Result result) {
+        if (!SiteApi.PUSH.equals(getKey()) || !result.getSubs().isEmpty()) return;
+        List<Sub> subs = Sub.listFrom(Objects.toString(getIntent().getStringExtra("subs"), ""));
+        if (subs.isEmpty()) return;
+        result.setSubs(subs);
+        SpiderDebug.log("video-flow", "intent subs applied count=%d", subs.size());
+    }
+
 
     private int danmakuTmdbId() {
         TmdbItem item = mTmdbUIAdapter == null ? null : mTmdbUIAdapter.getTmdbItem();

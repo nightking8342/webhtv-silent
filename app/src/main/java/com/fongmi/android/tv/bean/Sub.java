@@ -8,8 +8,13 @@ import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.player.PlayerHelper;
 import com.fongmi.android.tv.utils.UrlUtil;
 import com.github.catvod.utils.Trans;
+import com.google.gson.Gson;
 import com.google.gson.annotations.SerializedName;
+import com.google.gson.reflect.TypeToken;
 
+import java.lang.reflect.Type;
+import java.util.Collections;
+import java.util.List;
 public class Sub {
 
     @SerializedName("url")
@@ -39,6 +44,17 @@ public class Sub {
         sub.lang = lang;
         sub.format = format;
         return sub;
+    }
+
+    public static List<Sub> listFrom(String json) {
+        if (TextUtils.isEmpty(json)) return Collections.emptyList();
+        try {
+            Type type = new TypeToken<List<Sub>>() {}.getType();
+            List<Sub> subs = new Gson().fromJson(json, type);
+            return subs == null ? Collections.emptyList() : subs;
+        } catch (Throwable e) {
+            return Collections.emptyList();
+        }
     }
 
     public String getUrl() {
