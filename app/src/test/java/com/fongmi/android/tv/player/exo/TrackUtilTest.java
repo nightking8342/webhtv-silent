@@ -156,6 +156,47 @@ public class TrackUtilTest {
         assertFalse(auto.isDisabled());
     }
 
+    @Test
+    public void duplicateRuntimeIdsUseStableDescription() {
+        Format low = video("video/avc", 852, 480, "0:", "avc1.64001f");
+        Format middle = video("video/avc", 1280, 720, "0:", "avc1.64001f");
+        Format high = video("video/avc", 1920, 1080, "0:", "avc1.640028");
+        List<TrackUtil.Candidate> candidates = candidates(low, middle, high);
+        Track selected = new Track(C.TRACK_TYPE_VIDEO, "1080p", TrackUtil.describeStable(high)).playerId("0:");
+
+        TrackUtil.TrackInfo info = TrackUtil.find(candidates, selected);
+
+        assertEquals(2, info.trackIndex());
+        assertEquals(high, candidates.get(info.trackIndex()).format());
+    }
+
+    @Test
+    public void uniqueRuntimeIdsStillTakePrecedence() {
+        Format low = video("video/avc", 852, 480, "0", "avc1.64001f");
+        Format middle = video("video/avc", 1280, 720, "1", "avc1.64001f");
+        Format high = video("video/avc", 1920, 1080, "2", "avc1.640028");
+        List<TrackUtil.Candidate> candidates = candidates(low, middle, high);
+        // The stale description deliberately names the first variant; a unique id must win.
+        Track selected = new Track(C.TRACK_TYPE_VIDEO, "1080p", TrackUtil.describeStable(low)).playerId("2");
+
+        TrackUtil.TrackInfo info = TrackUtil.find(candidates, selected);
+
+        assertEquals(2, info.trackIndex());
+        assertEquals(high, candidates.get(info.trackIndex()).format());
+    }
+
+    private static List<TrackUtil.Candidate> candidates(Format... formats) {
+        List<TrackUtil.Candidate> candidates = new java.util.ArrayList<>(formats.length);
+        for (int i = 0; i < formats.length; i++) {
+            candidates.add(new TrackUtil.Candidate(null, i, formats[i]));
+        }
+        return candidates;
+    }
+
+    private static Format video(String mimeType, int width, int height, String id, String codecs) {
+        return video(mimeType, width, height).buildUpon().setId(id).setCodecs(codecs).build();
+    }
+
     private static Format video(String mimeType, int width, int height) {
         return new Format.Builder()
                 .setSampleMimeType(mimeType)

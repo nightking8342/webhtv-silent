@@ -148,27 +148,51 @@ public class TrackUtil {
     }
 
     private static TrackInfo find(Player player, Track track) {
-        Tracks currentTracks = player.getCurrentTracks();
+        return find(player.getCurrentTracks(), track);
+    }
+
+    static TrackInfo find(Tracks currentTracks, Track track) {
+        if (currentTracks == null || track == null) return null;
+        List<Candidate> candidates = new ArrayList<>();
+        for (Tracks.Group group : currentTracks.getGroups()) {
+            if (group.getType() != track.getType()) continue;
+            for (int i = 0; i < group.length; i++) {
+                candidates.add(new Candidate(group, i, group.getTrackFormat(i)));
+            }
+        }
+        return find(candidates, track);
+    }
+
+    /**
+     * Runtime ids are not guaranteed to identify one track: Media3's
+     * MergingMediaPeriod rewrites every HLS variant id to {@code "0:"} when an
+     * external subtitle is attached. Only trust an id when it resolves to one
+     * candidate; otherwise use the persisted stable description.
+     */
+    static TrackInfo find(List<Candidate> candidates, Track track) {
+        if (candidates == null || candidates.isEmpty() || track == null) return null;
         if (track.getPlayerId() != null) {
-            for (Tracks.Group group : currentTracks.getGroups()) {
-                if (group.getType() != track.getType()) continue;
-                for (int i = 0; i < group.length; i++) {
-                    if (track.getPlayerId().equals(group.getTrackFormat(i).id)) return new TrackInfo(group, i);
+            TrackInfo byId = null;
+            int matches = 0;
+            for (Candidate candidate : candidates) {
+                if (!track.getPlayerId().equals(candidate.format().id)) continue;
+                byId = new TrackInfo(candidate.group(), candidate.trackIndex());
+                if (++matches > 1) {
+                    byId = null;
+                    break;
                 }
             }
+            if (matches == 1) return byId;
         }
         if (track.getFormat() == null) return null;
         boolean stable = track.getFormat().startsWith(STABLE_PREFIX);
-        for (Tracks.Group trackGroup : currentTracks.getGroups()) {
-            if (trackGroup.getType() != track.getType()) continue;
-            for (int i = 0; i < trackGroup.length; i++) {
-                Format format = trackGroup.getTrackFormat(i);
-                boolean matches = stable
-                        ? track.getFormat().equals(describeStable(format))
-                        : track.getFormat().equals(PlayerHelper.describeFormat(format));
-                if (matches) {
-                    return new TrackInfo(trackGroup, i);
-                }
+        for (Candidate candidate : candidates) {
+            Format format = candidate.format();
+            boolean matches = stable
+                    ? track.getFormat().equals(describeStable(format))
+                    : track.getFormat().equals(PlayerHelper.describeFormat(format));
+            if (matches) {
+                return new TrackInfo(candidate.group(), candidate.trackIndex());
             }
         }
         return null;
@@ -220,6 +244,9 @@ public class TrackUtil {
         player.setTrackSelectionParameters(builder.build());
     }
 
-    private record TrackInfo(Tracks.Group trackGroup, int trackIndex) {
+    record TrackInfo(Tracks.Group trackGroup, int trackIndex) {
+    }
+
+    record Candidate(Tracks.Group group, int trackIndex, Format format) {
     }
 }
