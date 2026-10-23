@@ -341,7 +341,7 @@ public class VodFragment extends BaseFragment implements ConfigListener, SiteLis
         if (!Setting.isWebHomeFullscreen()) return;
         if (mWeb == null || !mWeb.isVisible()) return;
         JsonObject payload = new JsonObject();
-        payload.addProperty("mode", WebHomeChrome.EDGE);
+        payload.addProperty("mode", WebHomeChrome.IMMERSIVE);
         setChrome(payload);
     }
 

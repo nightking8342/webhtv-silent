@@ -44,7 +44,7 @@ public final class WebHomeChromeOptions {
     public static WebHomeChromeOptions fromSite(Site site) {
         JsonObject object = site == null ? null : site.getWebHomeChrome();
         String mode = site == null ? WebHomeChrome.NORMAL : site.getChromeMode();
-        if (TextUtils.isEmpty(mode)) mode = WebHomeChrome.EDGE;
+        if (TextUtils.isEmpty(mode)) mode = WebHomeChrome.IMMERSIVE;
         return from(object, mode);
     }
 

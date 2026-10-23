@@ -24,7 +24,11 @@ public final class WebHomeChromeStartup {
         if (!Setting.isWebHomeFullscreen()) return null;
         if (!matches(config)) return null;
         JsonObject object = parse(Prefers.getString(KEY_CHROME));
-        String mode = WebHomeChrome.normalize(Json.safeString(object, "mode"), WebHomeChrome.EDGE);
+        String mode = WebHomeChrome.normalize(Json.safeString(object, "mode"), WebHomeChrome.IMMERSIVE);
+        if (!Prefers.getBoolean(KEY_USER) && WebHomeChrome.EDGE.equals(mode)) {
+            mode = WebHomeChrome.IMMERSIVE;
+            object.addProperty("mode", mode);
+        }
         return WebHomeChrome.hidesNativeChrome(mode) ? object : null;
     }
 
@@ -48,7 +52,7 @@ public final class WebHomeChromeStartup {
         }
         if (config == null || TextUtils.isEmpty(config.getUrl()) || site == null || !site.hasHomePage() || chrome == null) return;
         JsonObject object = chrome.deepCopy();
-        String mode = WebHomeChrome.normalize(Json.safeString(object, "mode"), WebHomeChrome.EDGE);
+        String mode = WebHomeChrome.normalize(Json.safeString(object, "mode"), WebHomeChrome.IMMERSIVE);
         if (!WebHomeChrome.NORMAL.equals(mode) && !WebHomeChrome.EDGE.equals(mode)) return;
         object.addProperty("mode", mode);
         save(config, site, object, true);
@@ -63,7 +67,7 @@ public final class WebHomeChromeStartup {
 
     private static JsonObject chromeFromSite(Site site) {
         JsonObject object = site.getWebHomeChrome();
-        String mode = WebHomeChrome.normalize(site.getChromeMode(), WebHomeChrome.EDGE);
+        String mode = WebHomeChrome.normalize(site.getChromeMode(), WebHomeChrome.IMMERSIVE);
         if (!object.has("mode")) object.addProperty("mode", mode);
         return object;
     }
@@ -75,7 +79,7 @@ public final class WebHomeChromeStartup {
     }
 
     private static void save(Config config, Site site, JsonObject object, boolean user) {
-        if (!object.has("mode")) object.addProperty("mode", WebHomeChrome.EDGE);
+        if (!object.has("mode")) object.addProperty("mode", WebHomeChrome.IMMERSIVE);
         object.remove("startup");
         Prefers.put(KEY_CONFIG_URL, config.getUrl());
         Prefers.put(KEY_HOME_KEY, site.getKey());

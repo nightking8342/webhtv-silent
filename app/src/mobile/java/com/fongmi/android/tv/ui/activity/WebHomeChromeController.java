@@ -58,8 +58,8 @@ final class WebHomeChromeController {
             this.previousMode = WebHomeChrome.NORMAL;
             this.options = WebHomeChromeOptions.normal();
         } else if (savedInstanceState == null && startupChrome != null) {
-            this.options = WebHomeChromeOptions.from(startupChrome, WebHomeChrome.EDGE);
-            this.mode = WebHomeChrome.normalize(options.mode, WebHomeChrome.EDGE);
+            this.options = WebHomeChromeOptions.from(startupChrome, WebHomeChrome.IMMERSIVE);
+            this.mode = WebHomeChrome.normalize(options.mode, WebHomeChrome.IMMERSIVE);
             this.previousMode = WebHomeChrome.IMMERSIVE.equals(mode) ? WebHomeChrome.NORMAL : mode;
         } else {
             this.mode = savedInstanceState == null ? WebHomeChrome.NORMAL : WebHomeChrome.normalize(savedInstanceState.getString(STATE_MODE), WebHomeChrome.NORMAL);
@@ -92,7 +92,7 @@ final class WebHomeChromeController {
     }
 
     void applyDefault(JsonObject chrome) {
-        apply(WebHomeChromeOptions.from(chrome, WebHomeChrome.EDGE));
+        apply(WebHomeChromeOptions.from(chrome, WebHomeChrome.IMMERSIVE));
     }
 
     void setChrome(JsonObject payload) {
