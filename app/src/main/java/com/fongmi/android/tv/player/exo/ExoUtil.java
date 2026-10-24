@@ -356,7 +356,13 @@ public class ExoUtil {
         builder.setDrmConfiguration(buildDrmConfig(spec.getDrm()));
         builder.setRequestMetadata(buildRequestMetadata(spec));
         builder.setMediaMetadata(spec.getMetadata());
-        builder.setAdblock(Setting.isAdblock() && HlsRuleConfig.isLegacyFallbackEnabled());
+        // The Media3 fork filters HLS playlists inside the player, but that filter groups segments
+        // by URI prefix and has no false-positive guard: sources that split one movie over
+        // alternating CDN hosts (p16-*/p19-*) lose roughly half of their segments and the timeline
+        // then reports a much shorter duration than the real content. Ad filtering for HLS stays on
+        // the guarded app-side proxy path (MpvHlsProxy/HlsAdblockGuard), so the player must not
+        // filter the same playlist a second time.
+        builder.setAdblock(false);
         builder.setMimeType(spec.getFormat());
         builder.setImageDurationMs(15000);
         builder.setMediaId(mediaId == null || mediaId.isEmpty() ? spec.getKey() : mediaId);
