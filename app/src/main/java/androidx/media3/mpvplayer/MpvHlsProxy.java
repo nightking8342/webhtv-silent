@@ -924,9 +924,14 @@ public final class MpvHlsProxy extends NanoHTTPD {
         if (HlsAdblockPipeline.isCoreM3u8Proxy(url)) return text;
         if (kernel == PlayerSetting.MPV && !videoPlaylist) return text;
         try {
-            List<HlsManifestCleaner.Rule> rules = HlsRuleConfig.getRules();
-            boolean legacyFallback = HlsRuleConfig.isLegacyFallbackEnabled();
             HlsAdblockPipeline.Outcome outcome = HlsAdblockPipeline.apply(url, text, rules, legacyFallback);
+            if (outcome.legacy() && !HlsAdblockGuard.accepts(text, outcome.manifest())) {
+                SpiderDebug.log(TAG,
+                        "adblock rejected session=%d reason=unmarked-major-removal originalSec=%.1f filteredSec=%.1f url=%s",
+                        session, HlsAdblockGuard.totalDurationSeconds(text),
+                        HlsAdblockGuard.totalDurationSeconds(outcome.manifest()), shortUrl(url));
+                return text;
+            }
             if (kernel == PlayerSetting.MPV) {
                 HlsAdTimeline timeline = HlsAdTimeline.from(text, outcome.manifest());
                 SessionStats stats = sessionStats.get(session);
