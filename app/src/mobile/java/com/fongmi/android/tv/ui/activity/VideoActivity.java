@@ -10037,7 +10037,10 @@ private void checkOrientation() {
         } else {
             showDanmaku();
             restoreContextWall();
-            if (isStop()) finish();
+            if (isStop()) {
+                saveHistory(true);
+                finishPlayback();
+            }
         }
         updateDiscMenuTools();
     }
