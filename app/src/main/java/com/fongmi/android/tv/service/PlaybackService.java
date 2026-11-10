@@ -183,6 +183,9 @@ private AudioHistory.Record audioHistoryRecord;
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // A bound MediaSession keeps this instance alive after stopSelf(); a local
+        // start must revive the active flag so controls and shutdown keep working.
+        if (intent == null || intent.getAction() == null) running = true;
         if (SpiderDebug.isEnabled()) SpiderDebug.log("playback-lifecycle", "service startCommand action=%s flags=%d startId=%d %s", intent == null ? null : intent.getAction(), flags, startId, serviceState());
         if (intent != null) handleAction(intent.getAction());
         return super.onStartCommand(intent, flags, startId);
@@ -272,7 +275,7 @@ private AudioHistory.Record audioHistoryRecord;
     }
 
     public void shutdown() {
-        if (!running) return;
+        if (player == null || player.isReleased()) return;
         if (SpiderDebug.isEnabled()) SpiderDebug.log("playback-lifecycle", "service shutdown %s", serviceState());
         running = false;
         keepAlive = false;
