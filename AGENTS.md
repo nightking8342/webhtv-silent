@@ -2,6 +2,16 @@
 
 This file applies to the whole repository. Keep work correct, narrow, reversible, and fast. A nested `AGENTS.md` may add path-specific rules but may not weaken the safety, scope, or rollback rules here.
 
+## Fork identity and upstream sync (read first)
+
+This repository is a fork of `Silent1566/webhtv`, which is itself a fork of `webhtv/webhtv`:
+
+- `origin` → https://github.com/nightking8342/webhtv-silent (ours)
+- `silent` → https://github.com/Silent1566/webhtv (base line, read-only)
+- `upstream` → https://github.com/webhtv/webhtv (original, read-only)
+
+Read `FORK.md` in full before merging and before editing a registered divergent file. Sync uses `git merge silent/main` only; never merge `silent/beta` or `silent/dev*`, never rebase, squash, or force-push. Every deliberate divergence must be registered in `FORK.md` in the same commit.
+
 ## 1. Start with a bounded lane
 
 Before the first edit, state one completion sentence, the allowed paths, protected pre-existing dirty paths, the current local time and timezone, a realistic total-duration estimate with expected finish time, and the cheapest decisive verification. For multi-phase work, give a short estimate for each phase. Treat these estimates as execution targets rather than guard gates; when the estimate is reached or slips materially, stop optional work, state the cause, and continue with the narrowest completion path or a materially different shortest route. Do not let a stale estimate justify repeated checks, open-ended research, or an unfinished handoff. Use the smallest applicable lane:
