@@ -1610,7 +1610,8 @@ public class HomeWebController {
                 super.onPageStarted(view, url, favicon);
                 if (destroyed || view != webView) return;
                 WebHomeTarget currentTarget = pageHost.target();
-                if (currentTarget != null && currentTarget.isRemoteGlobal() && !currentTarget.allowsMainFrameUrl(url)) {
+                if (currentTarget != null && currentTarget.isRemoteGlobal() && !currentTarget.allowsMainFrameUrl(url)
+                        && !WebHomeVerificationPolicy.isVerificationUrl(url)) {
                     SpiderDebug.log("webhome-security", "blocked remote theme navigation url=%s origin=%s", safeLogUrl(url), currentTarget.getOriginRule());
                     view.stopLoading();
                     return;
@@ -1637,10 +1638,19 @@ public class HomeWebController {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 if (manifestRollbackInProgress) return;
-                if (!isCurrentPageFinish(view, url)) return;
+                if (!isCurrentPageFinish(view, url)) {
+                    // 挑战页常在 onPageFinished 前后用 location.replace 改写 URL：文档其实
+                    // 已经可见，只是地址对不上；不收起遮罩就会一直停在转圈状态。
+                    listener.onWebReady();
+                    return;
+                }
                 WebHomeTarget currentTarget = pageHost.target();
                 if (currentTarget == null) return;
-                if (currentTarget.isRemoteGlobal() && !currentTarget.allowsMainFrameUrl(url)) return;
+                if (currentTarget.isRemoteGlobal() && !currentTarget.allowsMainFrameUrl(url)
+                        && !WebHomeVerificationPolicy.isVerificationUrl(url)) {
+                    listener.onWebReady();
+                    return;
+                }
                 acceptManifestActivation(currentTarget);
                 logRuntime(WebThemeRuntimeDiagnostics.Event.DOCUMENT_READY, loadToken,
                         currentTarget.getPage(), currentTarget, url, WebThemeRuntimeDiagnostics.Reason.NONE, 0);
@@ -1680,6 +1690,14 @@ public class HomeWebController {
                         request.isForMainFrame(), status, safeLogUrl(request.getUrl()));
                 listener.onWebConsole("HTTP " + status + " " + reason + " " + safeLogUrl(request.getUrl()));
                 if (request.isForMainFrame()) {
+                    // Cloudflare/Turnstile 挑战页本身就是一次 403/429/503 响应，用户还要在
+                    // 这个文档上手动完成验证；当成加载失败会直接丢掉验证页并回退原生首页。
+                    if (WebHomeVerificationPolicy.isChallengeStatus(status)
+                            || WebHomeVerificationPolicy.isVerificationUrl(request.getUrl().toString())) {
+                        SpiderDebug.log("webhome-webview", "challenge kept code=%s url=%s",
+                                status, safeLogUrl(request.getUrl()));
+                        return;
+                    }
                     handleMainFrameFailure(WebThemeRuntimeDiagnostics.Reason.HTTP_ERROR,
                             status, "HTTP " + status + " " + reason);
                 }
@@ -1690,7 +1708,8 @@ public class HomeWebController {
                 if (destroyed || view != webView) return true;
                 WebHomeTarget currentTarget = pageHost.target();
                 boolean blocked = currentTarget != null && currentTarget.isRemoteGlobal()
-                        && !currentTarget.allowsMainFrameUrl(request.getUrl().toString());
+                        && !currentTarget.allowsMainFrameUrl(request.getUrl().toString())
+                        && !WebHomeVerificationPolicy.isVerificationUrl(request.getUrl().toString());
                 if (blocked) SpiderDebug.log("webhome-security", "blocked remote theme navigation url=%s origin=%s",
                         safeLogUrl(request.getUrl()), currentTarget.getOriginRule());
                 return blocked;
@@ -1702,7 +1721,10 @@ public class HomeWebController {
                 listener.onWebRequest(request.getMethod(), request.getUrl().toString(), request.isForMainFrame(), request.getRequestHeaders());
                 WebHomeTarget currentTarget = pageHost.target();
                 if (currentTarget != null && currentTarget.isRemoteGlobal() && request.isForMainFrame()
-                        && !currentTarget.allowsMainFrameUrl(request.getUrl().toString())) return blockedNavigation();
+                        && !currentTarget.allowsMainFrameUrl(request.getUrl().toString())
+                        && !WebHomeVerificationPolicy.isVerificationUrl(request.getUrl().toString())) {
+                    return blockedNavigation();
+                }
                 WebResourceResponse raw = rawAdapter == null ? null : rawAdapter.intercept(request);
                 return raw == null ? super.shouldInterceptRequest(view, request) : raw;
             }
