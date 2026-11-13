@@ -12,13 +12,16 @@
 
 ## 分支与同步
 
-| 分支 | 用途 |
-|---|---|
-| `main` | 跟随 `silent/main` 的发布基线，只做 merge，不放开发 |
-| `work/*` | 本 fork 的开发/移植分支（当前 `work/batch-a`） |
+| 分支 | 角色 | 生命周期 |
+|---|---|---|
+| `main` | **本 fork 的产品线**（默认分支）：验收后的提交都合入这里，发版与装机以此为准 | 永久 |
+| `work/*` | 短期任务分支：一个任务一组提交，验收后合入 `main`、打 tag 并删除 | 数天 |
+| `pr/*` | 可选：准备回馈给 Silent1566 的补丁，不承载本 fork 的发布 | 短期 |
 
 - 同步命令：`git merge silent/main`（按发布节奏，通常每次 release 后一次）。
 - **不要** merge `silent/beta` 或 `silent/dev1..dev5`；需要尝鲜时单独开 `preview/*`。
+- **不要** 使用 GitHub 的 “Sync fork” 按钮：它会把 `main` 拉回 `webhtv/webhtv`，覆盖本 fork 的产品线。
+- tag 是不可变锚点：`work/*` 合入并打 tag 后即可删除，不靠长期分支保留历史。
 - Silent1566 的仓库历史被上游压缩重写过，`git merge-base` 不代表真实归属；冲突判断以 `git diff` 的树差异为准。
 - 冲突处理：下表登记的分歧归我方，其余取 `silent/main`。
 
