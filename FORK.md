@@ -6,7 +6,7 @@
 - `silent`   → https://github.com/Silent1566/webhtv（基线，只读）
 - `upstream` → https://github.com/webhtv/webhtv（原始上游，只读）
 - 基线提交：`852d8428d3ea207c86bc1ce18c999ffce8df67ee`（`release/v5.6.0-beta-202611080849`，2026-11-08）
-- 应用身份：**暂沿用** `com.silent.android.webhtv`，版本 `5.6.0-webhtv.1`（versionCode 561）
+- 应用身份：**暂沿用** `com.silent.android.webhtv`，版本 `5.6.0-webhtv.2`（versionCode 562）
 
 维护原则：只保留可解释、可验证、可回退的差异。新增分歧必须先在本文件登记，再改代码。
 
@@ -35,7 +35,9 @@ last-synced-upstream: 4e30ffaf219b1db15fe5662aeff6f9820e2b32bf
 |---|---|---|
 | `app/src/main/java/com/fongmi/android/tv/web/HomeWebController.java`、新增 `WebHomeVerificationPolicy.java`（含测试） | Cloudflare/Turnstile 验证页以 403/429/503 返回、验证过程中会 `location.replace` 改写地址。不再把这类主框架响应当作加载失败；`onPageFinished` 即使 URL 变化或跨源也收起加载遮罩；放行 `challenges.cloudflare.com`、`/cdn-cgi/challenge-platform`、`__cf_chl`、`/verify` 等验证地址 | 我方（其余 WebHome 策略随 silent） |
 | `app/src/main/java/com/fongmi/android/tv/player/exo/ExoUtil.java` 的 `setAdblock` | 不启用 Media3 内部 HLS 广告过滤：该层按分段 URI 前缀分组且没有误判保护，交替 CDN（`p16-*`/`p19-*`）会丢一半分段导致时长减半；HLS 广告过滤交给 App 侧带守卫的路径 | 我方（仅该调用点） |
+| `MpvHlsProxy.java`、新增 `HlsAdblockGuard.java`（含 `HlsAdblockGuardTest`） | legacy HLS 过滤在清单没有任何广告标记、且删除时长超过 25% 时拒绝过滤并返回原清单，避免交替 CDN（`p16-*`/`p19-*`）被误删导致时长减半；只作用于 `outcome.legacy()` 路径，显式 structured 规则不受影响 | 我方（守卫；其余随 silent） |
 | `PlayerManager.java`、`TrackDialog.java`、`TrackUtil.java`、`Track.java`、`TrackAdapter.java`（含 `TrackUtilTest`） | 选轨持久化使用稳定描述（`v2|...`，不含运行期 id）；运行期 id 重复（外挂字幕合并后 HLS variant 全变 `0:`）时回退稳定描述匹配；“自动”轨道清空显式选择并恢复自适应 | 我方（选轨语义；其余随 silent） |
+| `web/HomeWebBridge.java`、`bean/Sub.java`、mobile/leanback `VideoActivity.java` | `player.playUrl`/`fm.play` 新增可选 `subtitle`（单条 URL）与 `subs`（数组，元素可为 URL 或 `{url,name,lang,format,flag}`）；仅在 PUSH 源且结果本身无字幕时注入 Intent 字幕 | 我方（新增参数与重载；其余随 silent） |
 | `app/src/main/java/com/fongmi/android/tv/service/PlaybackService.java` | 服务实例复用时 `onStartCommand` 恢复 `running=true`，避免 `stopSelf()` 之后无法停止 | 我方（仅运行态恢复） |
 | mobile `app/src/mobile/java/com/fongmi/android/tv/ui/activity/VideoActivity.java` | 播放自然停止时 `saveHistory(true)` 后走 `finishPlayback()`，确保停播与服务回收 | 我方（仅该分支） |
 | mobile `WebHomeChromeController.java`、`web/WebHomeChromeOptions.java`、`WebHomeChromeStartup.java`、mobile `VodFragment.java` | 手机端 WebHome 默认进入 `immersive`（隐藏状态栏与导航栏），站点显式配置 `edge` 时仍按原语义保留系统栏 | 我方（仅默认值） |
@@ -67,4 +69,6 @@ last-synced-upstream: 4e30ffaf219b1db15fe5662aeff6f9820e2b32bf
 
 - `TrackUtilTest` 14/14
 - `WebHomeVerificationPolicyTest` 5/5
+- `HlsAdblockGuardTest` 5/5
 - 平板实测（2026-11-13）：supjav 的 Cloudflare 验证页可正常显示，完成验证后继续请求，不再卡转圈
+- `fm.play` 字幕注入与 HLS legacy 过滤守卫已合入 `work/batch-b`，待真机回归
